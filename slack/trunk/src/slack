@@ -26,7 +26,6 @@ use Slack;
 
 sub run_backend(@);
 sub run_conditional_backend($@);
-sub logger(@);
 
 (my $PROG = $0) =~ s#.*/##;
 
@@ -105,12 +104,23 @@ Slack::get_options(
 );
 
 # Special options
-if ($opt{logfile}) {
-  my $logfile=$opt{logfile};
-  open(LOG, '>', $logfile) or die "Can't redirect stdout: $!";
-  open(STDERR, '>&', STDOUT) or die "Can't redirect stderr: $!";
-  open(STDERR, '>', $logfile) or die "Can't redirect stderr: $!";
-  print "----  Start of slack run ----";
+if ($opt{logconf}) {
+    # If log4perl is installed, wrap the DEBUG/INFO/WARN of all submodules with it
+    BEGIN {
+        eval { require Log::Log4perl; };
+        if($@) {
+            print "Log::Log4perl not installed, logging won't work\n";
+            no strict qw(refs);
+            *{"main::$_"} = sub { } for qw(DEBUG INFO WARN ERROR FATAL);
+        } else {
+            no warnings;
+            require Log::Log4perl::Level;
+            Log::Log4perl::Level->import(__PACKAGE__);
+            Log::Log4perl->import(qw(:easy));
+            Log::Log4perl::init($opt{logconf});
+            tie *STDERR, "Trapper";
+        }
+    }
 }
 
 if ($opt{'dry-run'}) {
@@ -294,14 +304,7 @@ ROLE: for my $role (@roles) {
   run_backend('slack-runscript',
     @{$backend_flags{postinstall}}, 'postinstall', $role);
 }
-close(LOG);
 exit 0;
-
-sub lprint {
-	my ($line) = @_;
-   print LOG $line;
-   print $line;
-}    
 
 sub run_backend (@) {
   my ($backend, @args) = @_;

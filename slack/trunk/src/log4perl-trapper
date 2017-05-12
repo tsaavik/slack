@@ -1,0 +1,20 @@
+########################################
+package Trapper;
+########################################
+# This allows us to trap PRINT to log4perl
+    
+use Log::Log4perl qw(:easy);
+    
+sub TIEHANDLE {
+   my $class = shift;
+   bless [], $class;
+}
+    
+sub PRINT {
+my $self = shift;
+   $Log::Log4perl::caller_depth++;
+   DEBUG @_;
+   $Log::Log4perl::caller_depth--;
+}
+
+1;
